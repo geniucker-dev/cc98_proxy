@@ -39,3 +39,7 @@ TO_PROXY = {
     "https://card.cc98.org": "card",
 }
 ```
+
+## 协议
+
+本项目基于 [GPL-3.0](LICENSE) 开源。
