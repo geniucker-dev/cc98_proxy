@@ -1,8 +1,12 @@
 import httpx
 import re
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, status
+import jwt
+from fastapi.responses import HTMLResponse, RedirectResponse
 from urllib.parse import urljoin, urlparse
 from functools import partial
+from datetime import datetime, timedelta, timezone
+import secrets
 
 app = FastAPI()
 
@@ -15,6 +19,21 @@ TO_PROXY = {
     "https://card.cc98.org": "card",
 }
 
+# JWT config
+# random key
+SECRET_KEY = secrets.token_urlsafe(32)
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30  # token expiring time
+
+users = {}
+
+# generate JWT token
+def create_access_token(data: dict, expires_delta: timedelta):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 async def handler(base_url: str, request: Request, path: str):
     """
@@ -26,6 +45,10 @@ async def handler(base_url: str, request: Request, path: str):
     headers = dict(request.headers)
     headers.pop("host", None)
     headers.pop("Host", None)
+    if "cookie" in headers:
+        cookies = headers["cookie"].split("; ")
+        filtered_cookies = [c for c in cookies if not c.startswith("proxy_access_token=")]
+        headers["cookie"] = "; ".join(filtered_cookies) if filtered_cookies else ""
 
     transport = httpx.AsyncHTTPTransport(retries=3)
     async with httpx.AsyncClient(transport=transport) as client:
@@ -83,6 +106,98 @@ async def handler(base_url: str, request: Request, path: str):
         resp.headers.pop("Content-Encoding", None)
         return Response(content=resp_content, status_code=resp.status_code, headers=dict(resp.headers))
 
+
+# get current user from cookie
+async def get_current_user(request: Request):
+    token = request.cookies.get("proxy_access_token")
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+        return username
+    except jwt.PyJWTError:
+        return None
+
+# middleware for checking authentication
+@app.middleware("http")
+async def check_auth(request: Request, call_next):
+    # skip login page
+    if request.url.path == "/login":
+        return await call_next(request)
+    # check token
+    current_user = await get_current_user(request)
+    if current_user is None:
+        # if not authenticated, redirect to login page
+        next_url = request.url.path
+        if request.query_params:
+            next_url += "?" + str(request.query_params)
+        return RedirectResponse(url=f"/login?next={next_url}")
+    return await call_next(request)
+
+# login page
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, next: str = "/"):
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <title>登录</title>
+    </head>
+    <body>
+        <h1>登录</h1>
+        <form method="post" action="/login?next={next}">
+            <label for="username">用户名:</label>
+            <input type="text" id="username" name="username"><br>
+            <label for="password">密码:</label>
+            <input type="password" id="password" name="password"><br>
+            <input type="submit" value="登录">
+        </form>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+# login submit
+@app.post("/login")
+async def login_submit(request: Request, next: str = "/"):
+    form = await request.form()
+    username = form.get("username")
+    password = form.get("password")
+    if username in users and users[username] == password:
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": username}, expires_delta=access_token_expires
+        )
+        response = RedirectResponse(url=next, status_code=status.HTTP_303_SEE_OTHER)
+        response.set_cookie(key="proxy_access_token", value=access_token, httponly=True)
+        return response
+    else:
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <title>登录</title>
+        </head>
+        <body>
+            <h1>登录</h1>
+            <p style="color: red;">用户名或密码错误</p>
+            <form method="post" action="/login?next={next}">
+                <label for="username">用户名:</label>
+                <input type="text" id="username" name="username"><br>
+                <label for="password">密码:</label>
+                <input type="password" id="password" name="password"><br>
+                <input type="submit" value="登录">
+            </form>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+
 # robots.txt: Disallow all
 @app.get("/robots.txt")
 async def robots():
@@ -106,6 +221,7 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     port = os.getenv("PORT", 8000)
     workers = os.getenv("WORKERS", 1)
+    users_str = os.getenv("USERS", "")
 
     # check validation of host, port, workers
     try:
@@ -121,6 +237,13 @@ if __name__ == "__main__":
             raise ValueError
     except ValueError:
         print("Invalid number of workers")
+        sys.exit(1)
+    try:
+        for user_str in users_str.split("`"):
+            username, password = user_str.split(":")
+            users[username] = password
+    except:
+        print("Invalid users")
         sys.exit(1)
 
     uvicorn.run(
