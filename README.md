@@ -18,7 +18,7 @@
 
 本项目默认会把 `x.cc98.org` 代理到 `/proxy/x`，并对响应进行重写，以保证页面正常显示。例如：`api.cc98.org` 会被代理到 `/proxy/api`。
 
-若需要使用自己的 api (`api.example.com`) 代理 `api.cc98.org`，请修改 `main.py` 中的 `TO_PROXY` 字典
+若需要使用自己的 api (`https://api.example.com`) 代理 `api.cc98.org`，请修改 `main.py` 中的 `TO_PROXY` 字典
 
 ```python
 # 原来的配置
