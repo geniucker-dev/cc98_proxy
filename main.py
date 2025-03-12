@@ -100,4 +100,8 @@ async def proxy(request: Request, path: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import os
+    host = os.getenv("HOST", "127.0.0.1")
+    port = os.getenv("PORT", 8000)
+    workers = os.getenv("WORKERS", 1)
+    uvicorn.run(app, host=host, port=port, workers=workers)
