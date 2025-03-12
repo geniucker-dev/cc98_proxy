@@ -123,4 +123,9 @@ if __name__ == "__main__":
         print("Invalid number of workers")
         sys.exit(1)
 
-    uvicorn.run(app, host=host, port=port, workers=workers)
+    uvicorn.run(
+        f"{__name__}:app",
+        host=host,
+        port=port,
+        workers=workers
+    )
