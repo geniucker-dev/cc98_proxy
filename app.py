@@ -129,7 +129,7 @@ async def get_current_user(request: Request):
 @app.middleware("http")
 async def check_auth(request: Request, call_next):
     # skip login page
-    if request.url.path == "/login":
+    if request.url.path == "/login" or request.url.path == "/robots.txt":
         return await call_next(request)
     # check token
     current_user = await get_current_user(request)
