@@ -46,6 +46,8 @@ async def handler(base_url: str, request: Request, path: str):
 
     url = urljoin(base_url, path)
 
+    income_base_url = request.headers.get("x-forwarded-proto", "http") + "://" + request.headers.get("x-forwarded-host", request.url.netloc)
+
     headers = dict(request.headers)
     headers.pop("host", None)
     headers.pop("Host", None)
@@ -68,9 +70,9 @@ async def handler(base_url: str, request: Request, path: str):
 
         for url in TO_PROXY:
             # replace https?://domain with TO_PROXY[domain]
-            resp_content = re.sub(f"https?://{urlparse(url).netloc}".encode(), urljoin(str(request.base_url), f"{TO_PROXY[url]}" if TO_PROXY[url].startswith("http") else f"/proxy/{TO_PROXY[url]}").encode(), resp_content)
+            resp_content = re.sub(f"https?://{urlparse(url).netloc}".encode(), urljoin(income_base_url, f"{TO_PROXY[url]}" if TO_PROXY[url].startswith("http") else f"/proxy/{TO_PROXY[url]}").encode(), resp_content)
             if "Location" in resp.headers:
-                resp.headers["Location"] = re.sub(f"https?://{urlparse(url).netloc}".encode(), urljoin(str(request.base_url), f"{TO_PROXY[url]}" if TO_PROXY[url].startswith("http") else f"/proxy/{TO_PROXY[url]}").encode(), resp.headers["Location"].encode()).decode()
+                resp.headers["Location"] = re.sub(f"https?://{urlparse(url).netloc}".encode(), urljoin(income_base_url, f"{TO_PROXY[url]}" if TO_PROXY[url].startswith("http") else f"/proxy/{TO_PROXY[url]}").encode(), resp.headers["Location"].encode()).decode()
 
         # rewrite absolute path in href, src, action to {path}+absolute_path
         # but keep those already start with /proxy
@@ -129,7 +131,7 @@ async def get_current_user(request: Request):
 @app.middleware("http")
 async def check_auth(request: Request, call_next):
     # skip login page
-    if request.url.path == "/login" or request.url.path == "/robots.txt":
+    if request.url.path == "/login":
         return await call_next(request)
     # check token
     current_user = await get_current_user(request)
