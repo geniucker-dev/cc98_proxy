@@ -7,8 +7,11 @@ from urllib.parse import urljoin, urlparse
 from functools import partial
 from datetime import datetime, timedelta, timezone
 import os
+import logging
 
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 app = FastAPI()
 
 TO_PROXY = {
@@ -129,6 +132,26 @@ async def get_current_user(request: Request):
         return username
     except jwt.PyJWTError:
         return None
+
+@app.middleware("http")
+async def log_request(request: Request, call_next):
+    """
+    middleware for logging request
+    """
+
+    client_host = request.headers.get("x-forwarded-for", request.client.host)
+    request_line = f"{request.method} {request.url.path}"
+    if request.url.query:
+        request_line += f"?{request.url.query}"
+    request_line += f' HTTP/{request.scope.get("http_version", "1.1")}'
+
+    try:
+        response = await call_next(request)
+        logger.info(f'\t{client_host}\t- "{request_line}" {response.status_code}')
+        return response
+    except:
+        logger.error(f'\t{client_host}\t- "{request_line}" 500')
+        raise
 
 @app.middleware("http")
 async def check_auth(request: Request, call_next):

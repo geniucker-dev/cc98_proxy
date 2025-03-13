@@ -3,6 +3,9 @@ if __name__ == "__main__":
     import os
     import sys
     import secrets
+    import logging
+
+    logging.basicConfig(level=logging.INFO)
 
     host = os.getenv("HOST", "127.0.0.1")
     port = os.getenv("PORT", 8000)
@@ -31,5 +34,6 @@ if __name__ == "__main__":
         "app:app",
         host=host,
         port=port,
-        workers=workers
+        workers=workers,
+        access_log=False
     )
