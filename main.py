@@ -7,6 +7,8 @@ from urllib.parse import urljoin, urlparse
 from functools import partial
 from datetime import datetime, timedelta, timezone
 import secrets
+import os
+import json
 
 app = FastAPI()
 
@@ -24,8 +26,6 @@ TO_PROXY = {
 SECRET_KEY = secrets.token_urlsafe(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30  # token expiring time
-
-users = {}
 
 # generate JWT token
 def create_access_token(data: dict, expires_delta: timedelta):
@@ -167,7 +167,9 @@ async def login_submit(request: Request, next: str = "/"):
     form = await request.form()
     username = form.get("username")
     password = form.get("password")
-    if username in users and users[username] == password:
+    with open("users.json") as f:
+        users = json.load(f)
+    if password == users.get(username):
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": username}, expires_delta=access_token_expires
@@ -221,7 +223,6 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     port = os.getenv("PORT", 8000)
     workers = os.getenv("WORKERS", 1)
-    users_str = os.getenv("USERS", "")
 
     # check validation of host, port, workers
     try:
@@ -238,12 +239,14 @@ if __name__ == "__main__":
     except ValueError:
         print("Invalid number of workers")
         sys.exit(1)
+
+    users_str = os.getenv("USERS", "")
     try:
-        for user_str in users_str.split("`"):
-            username, password = user_str.split(":")
-            users[username] = password
+        f = open("users.json")
+        json.load(f)
     except:
         print("Invalid users")
+        f.close()
         sys.exit(1)
 
     uvicorn.run(

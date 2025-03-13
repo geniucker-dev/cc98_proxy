@@ -2,7 +2,8 @@ FROM python:3.12-alpine
 
 WORKDIR /app
 
-RUN adduser --system nonroot -u 1000 -g 1000
+RUN adduser --system nonroot -u 1000 -g 1000 && \
+    chown -R 1000:1000 /app
 USER nonroot
 
 COPY requirements.txt /tmp/requirements.txt
