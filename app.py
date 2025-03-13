@@ -73,6 +73,9 @@ async def handler(base_url: str, request: Request, path: str):
             resp_content = re.sub(f"https?://{urlparse(url).netloc}".encode(), urljoin(income_base_url, f"{TO_PROXY[url]}" if TO_PROXY[url].startswith("http") else f"/proxy/{TO_PROXY[url]}").encode(), resp_content)
             if "Location" in resp.headers:
                 resp.headers["Location"] = re.sub(f"https?://{urlparse(url).netloc}".encode(), urljoin(income_base_url, f"{TO_PROXY[url]}" if TO_PROXY[url].startswith("http") else f"/proxy/{TO_PROXY[url]}").encode(), resp.headers["Location"].encode()).decode()
+        resp_content = re.sub(b"https?://www.cc98.org", income_base_url.encode(), resp_content)
+        if "Location" in resp.headers:
+            resp.headers["Location"] = re.sub(b"https?://www.cc98.org", income_base_url.encode(), resp.headers["Location"].encode()).decode()
 
         # rewrite absolute path in href, src, action to {path}+absolute_path
         # but keep those already start with /proxy
