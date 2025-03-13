@@ -11,6 +11,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt
 
 COPY main.py /app/main.py
+COPY app.py /app/app.py
 
 EXPOSE 8000
 
