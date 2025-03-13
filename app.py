@@ -25,8 +25,11 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30  # token expiring time
 
-# generate JWT token
 def create_access_token(data: dict, expires_delta: timedelta):
+    """
+    generate JWT token
+    """
+
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
     to_encode.update({"exp": expire})
@@ -110,8 +113,11 @@ async def handler(base_url: str, request: Request, path: str):
         return Response(content=resp_content, status_code=resp.status_code, headers=dict(resp.headers))
 
 
-# get current user from cookie
 async def get_current_user(request: Request):
+    """
+    get current user from cookie
+    """
+
     token = request.cookies.get("proxy_access_token")
     if not token:
         return None
@@ -124,9 +130,12 @@ async def get_current_user(request: Request):
     except jwt.PyJWTError:
         return None
 
-# middleware for checking authentication
 @app.middleware("http")
 async def check_auth(request: Request, call_next):
+    """
+    middleware for checking authentication
+    """
+
     # skip login page
     if request.url.path == "/login" or request.url.path == "/robots.txt":
         return await call_next(request)
@@ -140,9 +149,12 @@ async def check_auth(request: Request, call_next):
         return RedirectResponse(url=f"/login?next={next_url}")
     return await call_next(request)
 
-# login page
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, next: str = "/"):
+    """
+    login page
+    """
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="zh-CN">
@@ -164,13 +176,17 @@ async def login_page(request: Request, next: str = "/"):
     """
     return HTMLResponse(content=html_content)
 
-# login submit
 @app.post("/login")
 async def login_submit(request: Request, next: str = "/"):
+    """
+    login submit
+    """
+
     form = await request.form()
     username = form.get("username")
     password = form.get("password")
 
+    # use openid to check if username and password are correct
     transport = httpx.AsyncHTTPTransport(retries=3)
     async with httpx.AsyncClient(transport=transport) as client:
         resp = await client.post(
