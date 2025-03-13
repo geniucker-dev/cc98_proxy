@@ -25,12 +25,6 @@ SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30  # token expiring time
 
-# read users
-users = {}
-for user in os.getenv("USERS").split("`"):
-    username, password = user.split(":")
-    users[username] = password
-
 # generate JWT token
 def create_access_token(data: dict, expires_delta: timedelta):
     to_encode = data.copy()
@@ -134,7 +128,7 @@ async def get_current_user(request: Request):
 @app.middleware("http")
 async def check_auth(request: Request, call_next):
     # skip login page
-    if request.url.path == "/login":
+    if request.url.path == "/login" or request.url.path == "/robots.txt":
         return await call_next(request)
     # check token
     current_user = await get_current_user(request)
@@ -176,7 +170,21 @@ async def login_submit(request: Request, next: str = "/"):
     form = await request.form()
     username = form.get("username")
     password = form.get("password")
-    if password == users.get(username):
+
+    transport = httpx.AsyncHTTPTransport(retries=3)
+    async with httpx.AsyncClient(transport=transport) as client:
+        resp = await client.post(
+            "https://openid.cc98.org/connect/token",
+            data={
+                "client_id": "9a1fd200-8687-44b1-4c20-08d50a96e5cd",
+                "client_secret": "8b53f727-08e2-4509-8857-e34bf92b27f2",
+                "grant_type": "password",
+                "username": username,
+                "password": password,
+            },
+        )
+
+    if resp.status_code == 200 and "access_token" in resp.json():
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": username}, expires_delta=access_token_expires

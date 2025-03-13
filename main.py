@@ -24,16 +24,6 @@ if __name__ == "__main__":
         print("Invalid number of workers")
         sys.exit(1)
 
-    users_str = os.getenv("USERS", "")
-    try:
-        users = {}
-        for user in users_str.split("`"):
-            username, password = user.split(":")
-            users[username] = password
-    except:
-        print("Invalid users")
-        sys.exit(1)
-
     # randomize secret key
     os.environ["SECRET_KEY"] = secrets.token_urlsafe(32)
 
