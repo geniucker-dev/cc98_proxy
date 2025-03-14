@@ -13,13 +13,9 @@ import csv
 
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    filename="log.csv",
-    filemode="a",
-    format='%(message)s',
-)
+logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
+logger.addHandler(logging.FileHandler("log.csv", mode="a"))
 app = FastAPI()
 
 TO_PROXY = {
