@@ -138,6 +138,25 @@ async def get_current_user(request: Request):
         return None
 
 @app.middleware("http")
+async def check_auth(request: Request, call_next):
+    """
+    middleware for checking authentication
+    """
+
+    # skip login page
+    if request.url.path == "/login" or request.url.path == "/robots.txt":
+        return await call_next(request)
+    # check token
+    current_user = await get_current_user(request)
+    if current_user is None:
+        # if not authenticated, redirect to login page
+        next_url = request.url.path
+        if request.query_params:
+            next_url += "?" + str(request.query_params)
+        return RedirectResponse(url=f"/login?next={next_url}")
+    return await call_next(request)
+
+@app.middleware("http")
 async def log_request(request: Request, call_next):
     """
     middleware for logging request
@@ -163,25 +182,6 @@ async def log_request(request: Request, call_next):
         csv_writer.writerow([datetime.now().astimezone().isoformat(), client_host, request_line, 500, user_agent])
         logger.error(log_message_io.getvalue())
         raise
-
-@app.middleware("http")
-async def check_auth(request: Request, call_next):
-    """
-    middleware for checking authentication
-    """
-
-    # skip login page
-    if request.url.path == "/login" or request.url.path == "/robots.txt":
-        return await call_next(request)
-    # check token
-    current_user = await get_current_user(request)
-    if current_user is None:
-        # if not authenticated, redirect to login page
-        next_url = request.url.path
-        if request.query_params:
-            next_url += "?" + str(request.query_params)
-        return RedirectResponse(url=f"/login?next={next_url}")
-    return await call_next(request)
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, next: str = "/"):
