@@ -4,3 +4,4 @@ docker-compose.yml
 users.json
 
 .env
+log.csv

@@ -8,10 +8,18 @@ from functools import partial
 from datetime import datetime, timedelta, timezone
 import os
 import logging
+from io import StringIO
+import csv
 
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    filename="log.csv",
+    filemode="a",
+    format='%(message)s',
+)
+logger.addHandler(logging.StreamHandler())
 app = FastAPI()
 
 TO_PROXY = {
@@ -140,6 +148,7 @@ async def log_request(request: Request, call_next):
     """
 
     client_host = request.headers.get("x-forwarded-for", request.client.host)
+    user_agent = request.headers.get("user-agent", "-")
     request_line = f"{request.method} {request.url.path}"
     if request.url.query:
         request_line += f"?{request.url.query}"
@@ -147,10 +156,16 @@ async def log_request(request: Request, call_next):
 
     try:
         response = await call_next(request)
-        logger.info(f'\t{client_host}\t- "{request_line}" {response.status_code}')
+        log_message_io = StringIO()
+        csv_writer = csv.writer(log_message_io, lineterminator="")
+        csv_writer.writerow([datetime.now().astimezone().isoformat(), client_host, request_line, response.status_code, user_agent])
+        logger.info(log_message_io.getvalue())
         return response
     except:
-        logger.error(f'\t{client_host}\t- "{request_line}" 500')
+        log_message_io = StringIO()
+        csv_writer = csv.writer(log_message_io, lineterminator="")
+        csv_writer.writerow([datetime.now().astimezone().isoformat(), client_host, request_line, 500, user_agent])
+        logger.error(log_message_io.getvalue())
         raise
 
 @app.middleware("http")
